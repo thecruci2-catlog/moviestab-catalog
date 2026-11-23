@@ -1,0 +1,3 @@
+output/moviebox_progress*.jsonl
+*.tmp
+__pycache__/
