@@ -5,7 +5,7 @@ Supports:
   - Parallel sharding (--shard-index 0 --total-shards 4) for fast GitHub Actions runs
   - Automatic expired-link detection (`t=` timestamp check) + new title discovery
   - Pre-classification into `movies`, `series`, `anime`, and `short_tv`
-  - Batch cap (--max-titles 1500) so jobs stay well under GitHub's 6-hour timeout
+  - Batch cap (--max-titles 3000) so jobs stay well under GitHub's 6-hour timeout
   - Merge mode (--merge-only) to combine all shard progress logs into <23MB chunks
 """
 
@@ -55,23 +55,50 @@ BUILD_TAG_SALT = "oneroom"
 STREAM_REFERER = "https://sportslive.wine"
 SIGNATURE_BODY_MAX_BYTES = 102_400
 
-TAB_IDS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
+TAB_IDS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"]
 
 SEARCH_SEEDS = [
     "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
     "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    "aa", "ab", "ac", "ad", "ae", "af", "ag", "ah", "ai", "aj", "ak", "al", "am",
+    "an", "ao", "ap", "aq", "ar", "as", "at", "au", "av", "aw", "ax", "ay", "az",
+    "ba", "be", "bi", "bl", "bo", "br", "bu", "by",
+    "ca", "ce", "ch", "ci", "cl", "co", "cr", "cu",
+    "da", "de", "di", "do", "dr", "du", "dy",
+    "ea", "ec", "ed", "ef", "el", "em", "en", "ep", "er", "es", "et", "ev", "ex",
+    "fa", "fe", "fi", "fl", "fo", "fr", "fu",
+    "ga", "ge", "gh", "gi", "gl", "go", "gr", "gu",
+    "ha", "he", "hi", "ho", "hu",
+    "ia", "id", "ig", "il", "im", "in", "io", "ir", "is", "it",
+    "ja", "je", "ji", "jo", "ju",
+    "ka", "ke", "kh", "ki", "kn", "ko", "kr", "ku", "ky",
+    "la", "le", "li", "lo", "lu", "ly",
+    "ma", "me", "mi", "mo", "mu", "my",
+    "na", "ne", "ni", "no", "nu",
+    "oa", "ob", "oc", "od", "of", "oh", "oi", "ok", "ol", "om", "on", "oo", "op", "or", "os", "ot", "ou", "ov", "ow", "ox",
+    "pa", "pe", "ph", "pi", "pl", "po", "pr", "pu",
+    "qu",
+    "ra", "re", "rh", "ri", "ro", "ru", "ry",
+    "sa", "sc", "se", "sh", "si", "sk", "sl", "sm", "sn", "so", "sp", "sq", "st", "su", "sw", "sy",
+    "ta", "te", "th", "ti", "to", "tr", "ts", "tu", "tw", "ty",
+    "ua", "ub", "uc", "ul", "um", "un", "up", "ur", "us", "ut",
+    "va", "ve", "vi", "vo", "vu",
+    "wa", "we", "wh", "wi", "wo", "wr",
+    "xi", "xu",
+    "ya", "ye", "yi", "yo", "yu",
+    "za", "ze", "zi", "zo",
     "the", "love", "war", "man", "dark", "night", "star", "india",
-    "hindi", "tamil", "telugu", "malayalam", "kannada", "bengali",
+    "hindi", "tamil", "telugu", "malayalam", "kannada", "bengali", "marathi", "punjabi",
     "korean", "japanese", "chinese", "anime", "movie", "film", "series",
     "season", "part", "story", "life", "king", "queen", "boss", "world",
-    "dead", "last", "one", "two", "three", "2026", "2025", "2024",
+    "dead", "last", "one", "two", "three", "2026", "2025", "2024", "2023",
 ]
 
 PER_PAGE = 20
 MAX_SEARCH_PAGES = 100
-REQUEST_DELAY = 0.12
-MAX_HOMEPAGE_PAGES = 25
+REQUEST_DELAY = 0.10
+MAX_HOMEPAGE_PAGES = 30
 
 
 # ------------------------------------------------------------- signing -----
@@ -937,8 +964,8 @@ def write_catalog(done: dict):
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape MovieBox catalog into <23MB JSON chunks.")
-    parser.add_argument("--max-titles", type=int, default=1500,
-                        help="Max titles to fetch/refresh per run (default 1500; 0 = unlimited).")
+    parser.add_argument("--max-titles", type=int, default=3000,
+                        help="Max titles to fetch/refresh per run (default 3000; 0 = unlimited).")
     parser.add_argument("--shard-index", type=int, default=0,
                         help="Current worker shard index (0-based).")
     parser.add_argument("--total-shards", type=int, default=1,
