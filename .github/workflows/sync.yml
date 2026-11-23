@@ -2,16 +2,21 @@ name: Sync MovieBox Catalog JSON
 
 on:
   schedule:
-    - cron: '0 */5 * * *' # Runs automatically every 5 hours
+    - cron: '0 */5 * * *' # Runs at 00:00, 05:00, 10:00, 15:00, 20:00 UTC (every 5 hours)
   workflow_dispatch:
     inputs:
       max_titles_per_shard:
-        description: 'Max titles per parallel worker (default 1500)'
+        description: 'Max titles per parallel worker (default 3000)'
         required: false
-        default: '1500'
+        default: '3000'
 
 permissions:
   contents: write
+
+# Prevent overlapping runs so two syncs never collide on git push
+concurrency:
+  group: moviestab-catalog-sync
+  cancel-in-progress: false
 
 jobs:
   scrape-shards:
@@ -45,7 +50,7 @@ jobs:
           python moviebox_TUI_scraper.py
           --shard-index ${{ matrix.shard }}
           --total-shards 4
-          --max-titles "${{ github.event.inputs.max_titles_per_shard || '1500' }}"
+          --max-titles "${{ github.event.inputs.max_titles_per_shard || '3000' }}"
 
       - name: Save shard ${{ matrix.shard }} progress cache
         if: always()
@@ -68,6 +73,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -98,5 +105,6 @@ jobs:
             echo "No catalog changes detected."
           else
             git commit -m "chore: sync catalog JSON chunks ($(date -u +'%Y-%m-%d %H:%M UTC'))"
-            git push
+            git pull --rebase -X theirs origin main
+            git push origin main
           fi
