@@ -1,18 +1,19 @@
 {
-  "version_hash": "a3d16215674fffce2150a0286a08ce9be74922033dd870a8a545869fb4fd0f64",
-  "updated_at_epoch": 1795444632,
-  "total_items": 15215,
+  "version_hash": "6b361b83aa0b0df3e6e64ed03815d5f7092dfe16b6af7ab1166e96eee1988be2",
+  "updated_at_epoch": 1795460491,
+  "total_items": 16204,
   "categories": {
-    "movies": 9631,
-    "series": 4389,
-    "anime": 22,
-    "short_tv": 1173
+    "movies": 10326,
+    "series": 4617,
+    "anime": 23,
+    "short_tv": 1238
   },
-  "total_parts": 4,
+  "total_parts": 5,
   "files": [
     "catalog_part_1.json",
     "catalog_part_2.json",
     "catalog_part_3.json",
-    "catalog_part_4.json"
+    "catalog_part_4.json",
+    "catalog_part_5.json"
   ]
 }
