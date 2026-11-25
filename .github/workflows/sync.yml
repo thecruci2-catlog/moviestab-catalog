@@ -2,7 +2,7 @@ name: Sync MovieBox Catalog JSON
 
 on:
   schedule:
-    - cron: '0 */5 * * *' # Runs at 00:00, 05:00, 10:00, 15:00, 20:00 UTC (every 5 hours)
+    - cron: '0 */5 * * *' # Runs automatically every 5 hours
   workflow_dispatch:
     inputs:
       max_titles_per_shard:
@@ -13,7 +13,6 @@ on:
 permissions:
   contents: write
 
-# Prevent overlapping runs so two syncs never collide on git push
 concurrency:
   group: moviestab-catalog-sync
   cancel-in-progress: false
