@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       max_titles_per_shard:
-        description: 'Max titles per parallel worker (default 3000)'
+        description: 'Max titles per parallel worker in this run (default 3000)'
         required: false
         default: '3000'
 
@@ -35,15 +35,7 @@ jobs:
       - name: Install requests
         run: pip install requests
 
-      - name: Restore shard ${{ matrix.shard }} progress
-        uses: actions/cache/restore@v4
-        with:
-          path: output/moviebox_progress_shard_${{ matrix.shard }}.jsonl
-          key: mb-shard-${{ matrix.shard }}-${{ github.run_id }}
-          restore-keys: |
-            mb-shard-${{ matrix.shard }}-
-
-      - name: Run scraper shard ${{ matrix.shard }}
+      - name: Run scraper shard ${{ matrix.shard }} (fresh run)
         continue-on-error: true
         run: >
           python moviebox_TUI_scraper.py
@@ -51,14 +43,7 @@ jobs:
           --total-shards 4
           --max-titles "${{ github.event.inputs.max_titles_per_shard || '3000' }}"
 
-      - name: Save shard ${{ matrix.shard }} progress cache
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: output/moviebox_progress_shard_${{ matrix.shard }}.jsonl
-          key: mb-shard-${{ matrix.shard }}-${{ github.run_id }}
-
-      - name: Upload shard artifact for merge
+      - name: Upload current run shard artifact for merge
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -82,20 +67,21 @@ jobs:
       - name: Install requests
         run: pip install requests
 
-      - name: Download all shard progress files
+      - name: Download current run shard progress files
         uses: actions/download-artifact@v4
         with:
           path: downloaded_shards
           pattern: shard-progress-*
           merge-multiple: true
 
-      - name: Merge shards & split into <23MB JSON chunks
+      - name: Replace old chunks with fresh <23MB JSON chunks & update index.json
         run: |
           mkdir -p output
+          rm -f output/moviebox_progress*.jsonl
           cp downloaded_shards/*.jsonl output/ 2>/dev/null || true
           python moviebox_TUI_scraper.py --merge-only
 
-      - name: Commit and push JSON chunks
+      - name: Commit and push fresh JSON chunks
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -103,7 +89,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No catalog changes detected."
           else
-            git commit -m "chore: sync catalog JSON chunks ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git commit -m "chore: sync fresh catalog JSON chunks ($(date -u +'%Y-%m-%d %H:%M UTC'))"
             git pull --rebase -X theirs origin main
             git push origin main
           fi
