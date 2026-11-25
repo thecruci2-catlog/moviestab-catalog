@@ -3,10 +3,11 @@ MovieBox catalog scraper -> parallel sharded sync & <23MB JSON chunks for Movies
 
 Supports:
   - Parallel sharding (--shard-index 0 --total-shards 4) for fast GitHub Actions runs
-  - Automatic expired-link detection (`t=` timestamp check) + new title discovery
+  - Fresh per-run scraping (does not carry over old progress from prior runs)
   - Pre-classification into `movies`, `series`, `anime`, and `short_tv`
+  - Clean replacement of old `catalog_part_*.json` chunks + updated `index.json`
   - Batch cap (--max-titles 3000) so jobs stay well under GitHub's 6-hour timeout
-  - Merge mode (--merge-only) to combine all shard progress logs into <23MB chunks
+  - Merge mode (--merge-only) to combine current run shard logs into <23MB chunks
 """
 
 import argparse
@@ -803,37 +804,6 @@ def subject_to_entry(subject, moviebox, with_streams=True):
 
 # ------------------------------------------- expiration & progress io ------
 
-def has_expired_links(entry: dict, buffer_seconds: int = 7200) -> bool:
-    """Return True if any stream URL `t=` timestamp is expired or within 2h of expiring."""
-    now = int(time.time())
-    all_streams = list(entry.get("streams") or [])
-    for ep in entry.get("episodes") or []:
-        all_streams.extend(ep.get("streams") or [])
-
-    if not all_streams:
-        return True
-
-    for st in all_streams:
-        url = st.get("url") or ""
-        cookie = (st.get("headers") or {}).get("Cookie") or ""
-        for text in (url, cookie):
-            m = re.search(r"(?:[?&:]t=)(\d{10})", text)
-            if m and int(m.group(1)) <= (now + buffer_seconds):
-                return True
-    return False
-
-
-def has_any_playable_stream(entry: dict) -> bool:
-    for st in (entry.get("streams") or []):
-        if st.get("url") and not is_notice_url(st.get("url")):
-            return True
-    for ep in (entry.get("episodes") or []):
-        for st in (ep.get("streams") or []):
-            if st.get("url") and not is_notice_url(st.get("url")):
-                return True
-    return False
-
-
 def get_progress_path(shard_index: int, total_shards: int) -> str:
     if total_shards > 1:
         return os.path.join(OUT_DIR, f"moviebox_progress_shard_{shard_index}.jsonl")
@@ -861,7 +831,7 @@ def load_progress(progress_file: str) -> dict:
 
 
 def load_all_merged_progress() -> dict:
-    """Load and merge all progress files (single + all shards), keeping freshest entries."""
+    """Load and deduplicate current-run shard progress files only."""
     merged = {}
     patterns = [
         os.path.join(OUT_DIR, "moviebox_progress.jsonl"),
@@ -875,8 +845,7 @@ def load_all_merged_progress() -> dict:
         shard_data = load_progress(pfile)
         for sid, rec in shard_data.items():
             rec["category"] = classify_category(rec)
-            if sid not in merged or has_expired_links(merged[sid]):
-                merged[sid] = rec
+            merged[sid] = rec
     return merged
 
 
@@ -897,23 +866,21 @@ def append_progress(progress_file: str, entry: dict):
 
 # ---------------------------------------------------------------- main -----
 
-def write_catalog(done: dict, prune_empty: bool = False):
-    """Split collected items into <23MB JSON chunks + index.json inside output/."""
+def write_catalog(done: dict):
+    """Replace old `catalog_part_*.json` chunks with fresh ones and update `index.json`."""
     os.makedirs(OUT_DIR, exist_ok=True)
-
-    counts_by_cat = {"movies": 0, "series": 0, "anime": 0, "short_tv": 0}
-    all_items = []
-    for entry in done.values():
-        if prune_empty and not has_any_playable_stream(entry):
-            continue
-        cat = classify_category(entry)
-        entry["category"] = cat
-        counts_by_cat[cat] = counts_by_cat.get(cat, 0) + 1
-        all_items.append(entry)
 
     for fname in os.listdir(OUT_DIR):
         if fname.startswith("catalog_part_") and fname.endswith(".json"):
             os.remove(os.path.join(OUT_DIR, fname))
+
+    counts_by_cat = {"movies": 0, "series": 0, "anime": 0, "short_tv": 0}
+    all_items = []
+    for entry in done.values():
+        cat = classify_category(entry)
+        entry["category"] = cat
+        counts_by_cat[cat] = counts_by_cat.get(cat, 0) + 1
+        all_items.append(entry)
 
     part_num = 1
     current_chunk = []
@@ -978,17 +945,13 @@ def write_catalog(done: dict, prune_empty: bool = False):
 def main():
     parser = argparse.ArgumentParser(description="Scrape MovieBox catalog into <23MB JSON chunks.")
     parser.add_argument("--max-titles", type=int, default=3000,
-                        help="Max titles to fetch/refresh per run (default 3000; 0 = unlimited).")
+                        help="Max titles to fetch in this run (default 3000; 0 = unlimited).")
     parser.add_argument("--shard-index", type=int, default=0,
                         help="Current worker shard index (0-based).")
     parser.add_argument("--total-shards", type=int, default=1,
                         help="Total parallel worker shards.")
     parser.add_argument("--merge-only", action="store_true",
-                        help="Merge all shard progress files into <23MB JSON chunks and exit.")
-    parser.add_argument("--prune-empty", action="store_true",
-                        help="Exclude items that have zero playable streams when writing chunks.")
-    parser.add_argument("--fresh", action="store_true",
-                        help="Ignore saved progress and start over.")
+                        help="Merge current run shard files into <23MB JSON chunks and exit.")
     parser.add_argument("--seeds", default="",
                         help="Comma-separated search keywords instead of the default sweep.")
     args = parser.parse_args()
@@ -997,20 +960,17 @@ def main():
 
     if args.merge_only:
         merged = load_all_merged_progress()
-        counts = write_catalog(merged, prune_empty=args.prune_empty)
+        counts = write_catalog(merged)
         log(f"MERGE DONE: movies={counts['movies']}, series={counts['series']}, "
             f"anime={counts['anime']}, short_tv={counts['short_tv']} -> {counts['parts']} chunks")
         return 0
 
     progress_file = get_progress_path(args.shard_index, args.total_shards)
-    log(f"shard {args.shard_index + 1}/{args.total_shards} | progress -> {progress_file}")
-
-    if args.fresh and os.path.exists(progress_file):
+    if os.path.exists(progress_file):
         os.remove(progress_file)
-        log("progress cleared (--fresh)")
 
-    done = load_progress(progress_file)
-    log(f"resume: {len(done)} titles in shard cache")
+    log(f"shard {args.shard_index + 1}/{args.total_shards} | fresh run -> {progress_file}")
+    done = {}
 
     seeds = SEARCH_SEEDS
     if args.seeds:
@@ -1081,16 +1041,12 @@ def main():
 
     log(f"shard {args.shard_index + 1}/{args.total_shards} total assigned titles: {len(candidates)}")
 
-    pending = [
-        sid for sid in candidates
-        if sid not in done or has_expired_links(done[sid])
-    ]
-
+    pending = list(candidates.keys())
     limit = args.max_titles if args.max_titles > 0 else None
     if limit:
         pending = pending[:limit]
 
-    log(f"to fetch/refresh in this batch: {len(pending)}")
+    log(f"to fetch in this run: {len(pending)}")
 
     for i, sid in enumerate(pending, 1):
         subject = candidates[sid]
@@ -1117,17 +1073,17 @@ def main():
         if i % 50 == 0:
             compact_progress(progress_file, done)
             if args.total_shards == 1:
-                counts = write_catalog(done, prune_empty=args.prune_empty)
+                counts = write_catalog(done)
                 log(f"  checkpoint: {counts['total']} titles across {counts['parts']} chunks")
 
         time.sleep(REQUEST_DELAY)
 
     compact_progress(progress_file, done)
     if args.total_shards == 1:
-        counts = write_catalog(done, prune_empty=args.prune_empty)
+        counts = write_catalog(done)
         log(f"done: {counts['total']} titles -> {counts['parts']} chunks in {OUT_DIR}")
     else:
-        log(f"shard {args.shard_index + 1}/{args.total_shards} batch complete ({len(done)} total cached in shard)")
+        log(f"shard {args.shard_index + 1}/{args.total_shards} run complete ({len(done)} titles in shard)")
     return 0
 
 
