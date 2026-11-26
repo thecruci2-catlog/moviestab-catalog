@@ -5,6 +5,7 @@ Supports:
   - Parallel sharding (--shard-index 0 --total-shards 4) for fast GitHub Actions runs
   - Fresh per-run scraping (does not carry over old progress from prior runs)
   - Pre-classification into `movies`, `series`, `anime`, and `short_tv`
+  - Normalized `genres` lists (Action, Adventure, Sci-Fi, etc.) + genre counts in `index.json`
   - Clean replacement of old `catalog_part_*.json` chunks + updated `index.json`
   - Batch cap (--max-titles 3000) so jobs stay well under GitHub's 6-hour timeout
   - Merge mode (--merge-only) to combine current run shard logs into <23MB chunks
@@ -490,6 +491,49 @@ def extract_year(raw):
     return None
 
 
+GENRE_CANONICAL = {
+    "sci fi": "Sci-Fi",
+    "scifi": "Sci-Fi",
+    "sci-fi": "Sci-Fi",
+    "science fiction": "Sci-Fi",
+}
+
+
+def normalize_genres(raw_genres):
+    """Return a clean, deduplicated list of genre labels (e.g. Action, Adventure, Sci-Fi)."""
+    if not raw_genres:
+        return None
+
+    parts = []
+    if isinstance(raw_genres, list):
+        for g in raw_genres:
+            if isinstance(g, dict):
+                val = g.get("name") or g.get("genreName") or g.get("title") or g.get("label")
+                if val:
+                    parts.append(str(val))
+            elif g is not None:
+                parts.append(str(g))
+    elif isinstance(raw_genres, str):
+        parts.append(raw_genres)
+    else:
+        return None
+
+    cleaned = []
+    seen = set()
+    for chunk in parts:
+        for token in re.split(r"[,/|]+", chunk):
+            label = re.sub(r"\s+", " ", token).strip(" -·•")
+            if not label:
+                continue
+            canon = GENRE_CANONICAL.get(label.lower(), label)
+            key = canon.lower()
+            if key not in seen:
+                seen.add(key)
+                cleaned.append(canon)
+
+    return cleaned or None
+
+
 def quality_label(resolution):
     if resolution is None:
         return None
@@ -645,6 +689,8 @@ def subject_to_entry(subject, moviebox, with_streams=True):
         cover = subject["cover"].get("url")
     cover = cover or subject.get("coverUrl") or subject.get("poster") or subject.get("pic")
 
+    raw_genres = subject.get("genre") if subject.get("genre") is not None else subject.get("genres")
+
     entry = {
         "id": sid,
         "title": subject.get("title") or subject.get("name") or "Unknown",
@@ -657,7 +703,7 @@ def subject_to_entry(subject, moviebox, with_streams=True):
         "rating": subject.get("imdbRatingValue") or subject.get("rating"),
         "director": subject.get("director"),
         "cast": subject.get("stars"),
-        "genres": subject.get("genre") if isinstance(subject.get("genre"), list) else None,
+        "genres": normalize_genres(raw_genres),
         "duration": subject.get("duration"),
         "season_count": subject.get("season"),
         "streams": [],
@@ -676,8 +722,9 @@ def subject_to_entry(subject, moviebox, with_streams=True):
                 entry[key] = details[key]
         if not entry.get("rating") and details.get("imdbRatingValue"):
             entry["rating"] = details["imdbRatingValue"]
-        if isinstance(details.get("genre"), list) and not entry.get("genres"):
-            entry["genres"] = details["genre"]
+        if not entry.get("genres"):
+            det_genres = details.get("genre") if details.get("genre") is not None else details.get("genres")
+            entry["genres"] = normalize_genres(det_genres)
 
         dubs = details.get("dubs")
         if isinstance(dubs, list):
@@ -911,6 +958,7 @@ def load_progress(progress_file: str) -> dict:
                 continue
             sid = rec.get("id")
             if sid:
+                rec["genres"] = normalize_genres(rec.get("genres"))
                 rec["category"] = classify_category(rec)
                 done[str(sid)] = rec
     return done
@@ -930,6 +978,7 @@ def load_all_merged_progress() -> dict:
     for pfile in files:
         shard_data = load_progress(pfile)
         for sid, rec in shard_data.items():
+            rec["genres"] = normalize_genres(rec.get("genres"))
             rec["category"] = classify_category(rec)
             merged[sid] = rec
     return merged
@@ -961,12 +1010,18 @@ def write_catalog(done: dict):
             os.remove(os.path.join(OUT_DIR, fname))
 
     counts_by_cat = {"movies": 0, "series": 0, "anime": 0, "short_tv": 0}
+    genre_counts = {}
     all_items = []
     for entry in done.values():
+        entry["genres"] = normalize_genres(entry.get("genres"))
         cat = classify_category(entry)
         entry["category"] = cat
         counts_by_cat[cat] = counts_by_cat.get(cat, 0) + 1
+        for g in (entry.get("genres") or []):
+            genre_counts[g] = genre_counts.get(g, 0) + 1
         all_items.append(entry)
+
+    sorted_genres = dict(sorted(genre_counts.items(), key=lambda kv: (-kv[1], kv[0])))
 
     part_num = 1
     current_chunk = []
@@ -1010,6 +1065,7 @@ def write_catalog(done: dict):
         "updated_at_epoch": int(time.time()),
         "total_items": len(all_items),
         "categories": counts_by_cat,
+        "genres": sorted_genres,
         "total_parts": len(generated_files),
         "files": generated_files,
     }
@@ -1023,6 +1079,7 @@ def write_catalog(done: dict):
         "series": counts_by_cat["series"],
         "anime": counts_by_cat["anime"],
         "short_tv": counts_by_cat["short_tv"],
+        "genres": len(sorted_genres),
         "total": len(all_items),
         "parts": len(generated_files),
     }
@@ -1048,7 +1105,8 @@ def main():
         merged = load_all_merged_progress()
         counts = write_catalog(merged)
         log(f"MERGE DONE: movies={counts['movies']}, series={counts['series']}, "
-            f"anime={counts['anime']}, short_tv={counts['short_tv']} -> {counts['parts']} chunks")
+            f"anime={counts['anime']}, short_tv={counts['short_tv']}, "
+            f"genres={counts['genres']} -> {counts['parts']} chunks")
         return 0
 
     progress_file = get_progress_path(args.shard_index, args.total_shards)
