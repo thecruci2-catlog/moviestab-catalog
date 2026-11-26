@@ -522,7 +522,7 @@ def extract_raw_stream_url(st: dict) -> str:
     return ""
 
 
-def add_stream(bucket, item, source_link_hint=None):
+def add_stream(bucket, item, source_link_hint=None, default_headers=None, season=None, episode=None):
     if not isinstance(item, dict):
         return
     link = extract_raw_stream_url(item)
@@ -541,9 +541,11 @@ def add_stream(bucket, item, source_link_hint=None):
         "format": detect_format(link) if link else None,
         "codec": item.get("codecName") or item.get("codec"),
         "size": item.get("size"),
-        "season": item.get("se") or item.get("season"),
-        "episode": item.get("ep") or item.get("episode"),
+        "season": season if season is not None else (item.get("se") or item.get("season")),
+        "episode": episode if episode is not None else (item.get("ep") or item.get("episode")),
     }
+    if default_headers and link:
+        entry["headers"] = dict(default_headers)
     if not link:
         entry["note"] = "no direct url in resource listing"
     bucket.append(entry)
@@ -807,11 +809,39 @@ def subject_to_entry(subject, moviebox, with_streams=True):
 
         return found_any
 
+    def attach_episode_resources(se_num: int, ep_num: int):
+        res_ep = moviebox.resources(sid, se_num, ep_num)
+        time.sleep(REQUEST_DELAY)
+        if not isinstance(res_ep, dict):
+            return
+        for item in res_ep.get("list") or []:
+            if not isinstance(item, dict):
+                continue
+            link = extract_raw_stream_url(item)
+            if not link or is_notice_url(link):
+                continue
+            hdrs = {"Referer": STREAM_REFERER, "User-Agent": moviebox.ua}
+            stream_obj = {
+                "quality": quality_label(item.get("resolution") or item.get("quality")),
+                "url": link,
+                "format": detect_format(link),
+                "codec": item.get("codecName") or item.get("codec"),
+                "size": item.get("size"),
+                "headers": hdrs,
+                "season": se_num,
+                "episode": ep_num,
+            }
+            for ep in entry["episodes"]:
+                if ep["season"] == se_num and ep["episode"] == ep_num:
+                    ep["streams"].append(stream_obj)
+                    break
+
     if is_series and entry["episodes"]:
         for ep in entry["episodes"]:
             payload = moviebox.play_info(sid, ep["season"], ep["episode"])
             time.sleep(REQUEST_DELAY)
             harvest(payload, ep["season"], ep["episode"])
+            attach_episode_resources(ep["season"], ep["episode"])
     elif is_series:
         miss_streak = 0
         for ep_num in range(1, 31):
@@ -819,6 +849,7 @@ def subject_to_entry(subject, moviebox, with_streams=True):
             time.sleep(REQUEST_DELAY)
             if harvest(payload, 1, ep_num):
                 miss_streak = 0
+                attach_episode_resources(1, ep_num)
             else:
                 miss_streak += 1
                 if miss_streak >= 3:
@@ -838,15 +869,20 @@ def subject_to_entry(subject, moviebox, with_streams=True):
         for item in res_payload.get("list") or []:
             add_stream(entry["streams"], item)
 
-    seen = set()
-    uniq = []
-    for s in entry["streams"]:
-        key = (s.get("url"), s.get("quality"), s.get("season"), s.get("episode"))
-        if not s.get("url") or key in seen:
-            continue
-        seen.add(key)
-        uniq.append(s)
-    entry["streams"] = uniq
+    def dedup_stream_list(stream_list):
+        seen = set()
+        uniq = []
+        for s in stream_list:
+            key = (s.get("url"), s.get("quality"), s.get("format"), s.get("season"), s.get("episode"))
+            if not s.get("url") or key in seen:
+                continue
+            seen.add(key)
+            uniq.append(s)
+        return uniq
+
+    entry["streams"] = dedup_stream_list(entry["streams"])
+    for ep in entry["episodes"]:
+        ep["streams"] = dedup_stream_list(ep["streams"])
     entry["category"] = classify_category(entry, stype)
 
     return entry
@@ -1109,9 +1145,19 @@ def main():
         if entry:
             append_progress(progress_file, entry)
             done[sid] = entry
+            sample_url = ""
+            if i <= 10:
+                first_st = next((s.get("url") for s in (entry.get("streams") or []) if s.get("url")), "")
+                if not first_st:
+                    for ep in (entry.get("episodes") or []):
+                        first_st = next((s.get("url") for s in (ep.get("streams") or []) if s.get("url")), "")
+                        if first_st:
+                            break
+                if first_st:
+                    sample_url = f" sample_url={first_st}"
             log(f"[{i}/{len(pending)}] {entry['title'][:42]} "
                 f"[{entry['category']}] streams={len(entry['streams'])} "
-                f"eps={len(entry['episodes'])}")
+                f"eps={len(entry['episodes'])}{sample_url}")
         else:
             fallback = subject_to_entry(subject, mb, with_streams=False)
             if fallback:
