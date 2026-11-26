@@ -512,14 +512,24 @@ def detect_format(url: str):
     return "unknown"
 
 
+def extract_raw_stream_url(st: dict) -> str:
+    if not isinstance(st, dict):
+        return ""
+    for key in ("url", "playUrl", "videoUrl", "dashUrl", "hlsUrl", "m3u8Url", "mp4Url", "resourceLink", "downloadUrl"):
+        val = st.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
+
+
 def add_stream(bucket, item, source_link_hint=None):
     if not isinstance(item, dict):
         return
-    link = item.get("resourceLink") or item.get("url") or item.get("downloadUrl")
+    link = extract_raw_stream_url(item)
     if link and is_notice_url(link):
         link = None
 
-    resolution = item.get("resolution")
+    resolution = item.get("resolution") or item.get("quality")
     if resolution is None and source_link_hint:
         m = re.search(r"(?<!\d)(\d{3,4})[pP]", str(source_link_hint))
         if m:
@@ -531,8 +541,8 @@ def add_stream(bucket, item, source_link_hint=None):
         "format": detect_format(link) if link else None,
         "codec": item.get("codecName") or item.get("codec"),
         "size": item.get("size"),
-        "season": item.get("se"),
-        "episode": item.get("ep"),
+        "season": item.get("se") or item.get("season"),
+        "episode": item.get("ep") or item.get("episode"),
     }
     if not link:
         entry["note"] = "no direct url in resource listing"
@@ -724,26 +734,41 @@ def subject_to_entry(subject, moviebox, with_streams=True):
                         "streams": [],
                     })
 
-    def harvest(payload, season=0, episode=0):
+    def harvest(payload, season=0, episode=0) -> bool:
+        found_any = False
         if not isinstance(payload, dict):
-            return
+            return False
         data = payload.get("data", payload)
-        for st in data.get("streams") or []:
+        if not isinstance(data, dict):
+            return False
+
+        raw_streams = data.get("streams")
+        if not isinstance(raw_streams, list) or not raw_streams:
+            for alt_key in ("list", "playList", "items"):
+                alt_val = data.get(alt_key)
+                if isinstance(alt_val, list) and alt_val:
+                    raw_streams = alt_val
+                    break
+        if not isinstance(raw_streams, list):
+            raw_streams = []
+
+        for st in raw_streams:
             if not isinstance(st, dict):
                 continue
             cookie = st.get("signCookie") or ""
             playable = manifest_from_cookie(cookie)
             if not playable:
-                raw_url = st.get("url") or ""
+                raw_url = extract_raw_stream_url(st)
                 playable = None if is_notice_url(raw_url) else (raw_url or None)
             if not playable:
                 continue
 
+            found_any = True
             hdrs = {"Referer": STREAM_REFERER, "User-Agent": moviebox.ua}
             if cookie:
                 hdrs["Cookie"] = clean_cookie(cookie)
 
-            res_str = st.get("resolutions") or data.get("displayResolutions") or "1080"
+            res_str = st.get("resolutions") or data.get("displayResolutions") or st.get("resolution") or "1080"
             resolutions = []
             for r in str(res_str).split(","):
                 r = r.strip()
@@ -765,18 +790,43 @@ def subject_to_entry(subject, moviebox, with_streams=True):
                     "episode": episode or None,
                 }
                 if season and episode:
+                    matched = False
                     for ep in entry["episodes"]:
                         if ep["season"] == season and ep["episode"] == episode:
                             ep["streams"].append(dict(stream_obj))
+                            matched = True
                             break
+                    if not matched:
+                        entry["episodes"].append({
+                            "season": season,
+                            "episode": episode,
+                            "streams": [dict(stream_obj)],
+                        })
                 else:
                     entry["streams"].append(stream_obj)
+
+        return found_any
 
     if is_series and entry["episodes"]:
         for ep in entry["episodes"]:
             payload = moviebox.play_info(sid, ep["season"], ep["episode"])
             time.sleep(REQUEST_DELAY)
             harvest(payload, ep["season"], ep["episode"])
+    elif is_series:
+        miss_streak = 0
+        for ep_num in range(1, 31):
+            payload = moviebox.play_info(sid, 1, ep_num)
+            time.sleep(REQUEST_DELAY)
+            if harvest(payload, 1, ep_num):
+                miss_streak = 0
+            else:
+                miss_streak += 1
+                if miss_streak >= 3:
+                    break
+        if not entry["episodes"]:
+            payload = moviebox.play_info(sid)
+            time.sleep(REQUEST_DELAY)
+            harvest(payload)
     else:
         payload = moviebox.play_info(sid)
         time.sleep(REQUEST_DELAY)
