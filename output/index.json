@@ -1,38 +1,19 @@
 {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  "version_hash": "dca90c5c741435a612d868b7159fb1dfa4f3566440efdf90ab6ee7936c2286a1",
-  "updated_at_epoch": 1795681007,
-  "total_items": 9358,
+  "version_hash": "c0f4a491bbfd38000af335dac98a511fbcfaa87966ebb2b0cf2a91a79bb9e1f0",
+  "updated_at_epoch": 1795709394,
+  "total_items": 1473,
   "categories": {
-    "movies": 5714,
-    "series": 2866,
-    "anime": 14,
-    "short_tv": 764
-=======
-  "version_hash": "8973e91fd188c8e6276c7eb2fe5cef20d4051bbe54f6b5284055ac1bfe0b1b37",
-  "updated_at_epoch": 1795693746,
-  "total_items": 12000,
-  "categories": {
-    "movies": 7597,
-    "series": 3352,
-    "anime": 21,
-    "short_tv": 1030
->>>>>>> Stashed changes
-=======
-  "version_hash": "e4c5e1cdf8e48103c030fba473b955981af149b7a694d223656a081ef01eb17c",
-  "updated_at_epoch": 1795702370,
-  "total_items": 4222,
-  "categories": {
-    "movies": 2145,
-    "series": 1390,
-    "anime": 4,
-    "short_tv": 683
->>>>>>> Stashed changes
+    "movies": 621,
+    "series": 449,
+    "anime": 3,
+    "short_tv": 400
   },
-  "total_parts": 2,
+  "total_parts": 5,
   "files": [
     "catalog_part_1.json",
-    "catalog_part_2.json"
+    "catalog_part_2.json",
+    "catalog_part_3.json",
+    "catalog_part_4.json",
+    "catalog_part_5.json"
   ]
 }
