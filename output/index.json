@@ -1,4 +1,5 @@
 {
+<<<<<<< Updated upstream
   "version_hash": "c0f4a491bbfd38000af335dac98a511fbcfaa87966ebb2b0cf2a91a79bb9e1f0",
   "updated_at_epoch": 1795709394,
   "total_items": 1473,
@@ -16,4 +17,18 @@
     "catalog_part_4.json",
     "catalog_part_5.json"
   ]
+=======
+  "version_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "updated_at_epoch": 1795712451,
+  "total_items": 0,
+  "categories": {
+    "movies": 0,
+    "series": 0,
+    "anime": 0,
+    "short_tv": 0
+  },
+  "genres": {},
+  "total_parts": 0,
+  "files": []
+>>>>>>> Stashed changes
 }
