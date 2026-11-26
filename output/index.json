@@ -1,4 +1,5 @@
 {
+<<<<<<< Updated upstream
   "version_hash": "dca90c5c741435a612d868b7159fb1dfa4f3566440efdf90ab6ee7936c2286a1",
   "updated_at_epoch": 1795681007,
   "total_items": 9358,
@@ -7,6 +8,16 @@
     "series": 2866,
     "anime": 14,
     "short_tv": 764
+=======
+  "version_hash": "8973e91fd188c8e6276c7eb2fe5cef20d4051bbe54f6b5284055ac1bfe0b1b37",
+  "updated_at_epoch": 1795693746,
+  "total_items": 12000,
+  "categories": {
+    "movies": 7597,
+    "series": 3352,
+    "anime": 21,
+    "short_tv": 1030
+>>>>>>> Stashed changes
   },
   "total_parts": 4,
   "files": [
