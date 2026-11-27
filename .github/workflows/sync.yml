@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       max_titles_per_shard:
-        description: 'Max titles per parallel worker in this run (default 3000)'
+        description: 'Max titles per parallel worker in this run (default 1000)'
         required: false
-        default: '3000'
+        default: '1000'
 
 permissions:
   contents: write
@@ -20,11 +20,11 @@ concurrency:
 jobs:
   scrape-shards:
     runs-on: ubuntu-latest
-    timeout-minutes: 270
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@v4
 
@@ -40,8 +40,8 @@ jobs:
         run: >
           python moviebox_TUI_scraper.py
           --shard-index ${{ matrix.shard }}
-          --total-shards 4
-          --max-titles "${{ github.event.inputs.max_titles_per_shard || '3000' }}"
+          --total-shards 6
+          --max-titles "${{ github.event.inputs.max_titles_per_shard || '1000' }}"
 
       - name: Upload current run shard artifact for merge
         if: always()
