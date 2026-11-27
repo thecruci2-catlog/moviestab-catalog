@@ -1,5 +1,5 @@
 """
-MovieBox catalog scraper -> fast parallel sharded sync & ~10MB JSON chunks for MoviesTab.
+MovieBox catalog scraper -> parallel sharded sync & ~10MB JSON chunks for MoviesTab.
 """
 
 import argparse
@@ -34,7 +34,7 @@ HOST_POOL = [
 ]
 
 RETRY_STATUS = {403, 406, 407, 429, 500, 502, 503, 504}
-HTTP_TIMEOUT = 5
+HTTP_TIMEOUT = 6
 
 SECRET_KEY = bytes([
     0xEF, 0xA8, 0x91, 0x97, 0x4E, 0xEC, 0xD3, 0x14,
@@ -51,17 +51,26 @@ SIGNATURE_BODY_MAX_BYTES = 102_400
 TAB_IDS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"]
 
 SEARCH_SEEDS = [
-    "a", "e", "i", "o", "u", "s", "t", "m", "r", "n", "l", "d", "c", "p", "b", "h", "g", "k", "w", "f",
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+    "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
     "hindi", "tamil", "telugu", "malayalam", "kannada", "bengali", "marathi", "punjabi",
-    "korean", "japanese", "chinese", "anime", "movie", "series", "season", "show",
-    "love", "war", "man", "dark", "night", "king", "queen", "boss", "world", "story",
+    "korean", "japanese", "chinese", "anime", "movie", "film", "series",
+    "season", "part", "story", "life", "king", "queen", "boss", "world",
+    "study", "course", "lecture", "tutorial", "class", "education",
     "2026", "2025", "2024", "2023",
 ]
 
 PER_PAGE = 20
-MAX_SEARCH_PAGES = 10
-REQUEST_DELAY = 0.03
-MAX_HOMEPAGE_PAGES = 10
+MAX_SEARCH_PAGES = 25
+REQUEST_DELAY = 0.04
+MAX_HOMEPAGE_PAGES = 20
+
+STUDY_KEYWORDS = (
+    "study", "studies", "lecture", "lectures", "course", "courses",
+    "tutorial", "tutorials", "lesson", "lessons", "exam", "exams",
+    "educational", "education", "classroom", "syllabus", "training", "workshop",
+)
 
 
 # ------------------------------------------------------------- signing -----
@@ -358,10 +367,20 @@ NOTICE_MARKERS = [
 ]
 
 
-def is_notice_url(url: str) -> bool:
-    if not url:
+def sanitize_url(raw_url) -> str | None:
+    if not isinstance(raw_url, str):
+        return None
+    cleaned = re.sub(r"[\x00-\x20\x7f]", "", raw_url).strip()
+    if not cleaned or not cleaned.startswith(("http://", "https://")):
+        return None
+    return cleaned
+
+
+def is_notice_url(url: str | None) -> bool:
+    clean = sanitize_url(url)
+    if not clean:
         return True
-    low = url.lower()
+    low = clean.lower()
     if any(m in low for m in NOTICE_MARKERS):
         return True
     if "macdn.aoneroom.com" in low and "/other/" in low:
@@ -370,7 +389,7 @@ def is_notice_url(url: str) -> bool:
 
 
 def b64_decode_loose(s: str):
-    s = s.strip()
+    s = re.sub(r"[\r\n\t ]+", "", s.strip())
     s = s.replace("-", "+").replace("_", "/").replace("~", "/")
     pad = (4 - len(s) % 4) % 4
     if pad:
@@ -382,8 +401,8 @@ def b64_decode_loose(s: str):
 
 
 def to_dash_mpd(url: str):
-    base = url.rstrip("*").rstrip("/")
-    if base.startswith(("http://", "https://")) and "/dash/" in base:
+    base = sanitize_url(url.rstrip("*").rstrip("/"))
+    if base and "/dash/" in base:
         return base + "/index.mpd"
     return None
 
@@ -403,10 +422,10 @@ def manifest_from_cookie(cookie: str):
             decoded = b64_decode_loose(token)
             if decoded:
                 try:
-                    mpd = to_dash_mpd(decoded.decode("utf-8"))
+                    mpd = to_dash_mpd(decoded.decode("utf-8", errors="ignore"))
                     if mpd:
                         return mpd
-                except UnicodeDecodeError:
+                except Exception:
                     pass
             if chunk.startswith(("http://", "https://")):
                 mpd = to_dash_mpd(chunk.split(":sign")[0])
@@ -433,8 +452,21 @@ def manifest_from_cookie(cookie: str):
 
 
 def clean_cookie(cookie: str) -> str:
-    parts = [p.strip() for p in cookie.split(";") if p.strip()]
+    parts = [re.sub(r"[\r\n]+", "", p).strip() for p in cookie.split(";") if p.strip()]
     return "; ".join(parts)
+
+
+def clean_headers(hdrs: dict | None) -> dict | None:
+    if not isinstance(hdrs, dict) or not hdrs:
+        return None
+    out = {}
+    for k, v in hdrs.items():
+        if isinstance(k, str) and isinstance(v, str):
+            ck = re.sub(r"[\r\n]+", "", k).strip()
+            cv = re.sub(r"[\r\n]+", "", v).strip()
+            if ck and cv:
+                out[ck] = cv
+    return out or None
 
 
 def extract_year(raw):
@@ -498,10 +530,11 @@ def quality_label(resolution):
     return s or None
 
 
-def detect_format(url: str):
-    if not url:
+def detect_format(url: str | None):
+    clean = sanitize_url(url)
+    if not clean:
         return None
-    low = url.lower()
+    low = clean.lower()
     if ".m3u8" in low:
         return "m3u8"
     if "/dash/" in low or ".mpd" in low:
@@ -511,22 +544,22 @@ def detect_format(url: str):
     return "unknown"
 
 
-def extract_raw_stream_url(st: dict) -> str:
+def extract_raw_stream_url(st: dict) -> str | None:
     if not isinstance(st, dict):
-        return ""
+        return None
     for key in ("url", "playUrl", "videoUrl", "dashUrl", "hlsUrl", "m3u8Url", "mp4Url", "resourceLink", "downloadUrl"):
-        val = st.get(key)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-    return ""
+        val = sanitize_url(st.get(key))
+        if val:
+            return val
+    return None
 
 
 def add_stream(bucket, item, source_link_hint=None, default_headers=None, season=None, episode=None, prepend=False):
     if not isinstance(item, dict):
         return
     link = extract_raw_stream_url(item)
-    if link and is_notice_url(link):
-        link = None
+    if not link or is_notice_url(link):
+        return
 
     resolution = item.get("resolution") or item.get("quality")
     if resolution is None and source_link_hint:
@@ -537,16 +570,15 @@ def add_stream(bucket, item, source_link_hint=None, default_headers=None, season
     entry = {
         "quality": quality_label(resolution),
         "url": link,
-        "format": detect_format(link) if link else None,
+        "format": detect_format(link),
         "codec": item.get("codecName") or item.get("codec"),
         "size": item.get("size"),
         "season": season if season is not None else (item.get("se") or item.get("season")),
         "episode": episode if episode is not None else (item.get("ep") or item.get("episode")),
     }
-    if default_headers and link:
-        entry["headers"] = dict(default_headers)
-    if not link:
-        entry["note"] = "no direct url in resource listing"
+    ch = clean_headers(default_headers)
+    if ch:
+        entry["headers"] = ch
     if prepend:
         bucket.insert(0, entry)
     else:
@@ -593,11 +625,18 @@ def subjects_from_homepage(payload):
 
 
 def classify_category(entry: dict, raw_stype=None) -> str:
+    """
+    Classify item into 'study', 'short_tv', 'anime', 'series', or 'movies'.
+    """
     streams = entry.get("streams") or []
     episodes = entry.get("episodes") or []
     genres = [str(g).lower() for g in (entry.get("genres") or [])]
     title_low = (entry.get("title") or "").lower()
     desc_low = (entry.get("description") or "").lower()
+    text_blob = f"{title_low} {desc_low} {' '.join(genres)}"
+
+    if any(kw in text_blob for kw in STUDY_KEYWORDS):
+        return "study"
 
     if raw_stype is not None:
         try:
@@ -652,7 +691,7 @@ def subject_to_entry(subject, moviebox, with_streams=True):
         "category": "series" if is_series else "movies",
         "year": extract_year(subject.get("releaseDate") or subject.get("year")
                              or subject.get("releaseInfo")),
-        "poster": cover,
+        "poster": sanitize_url(cover),
         "description": subject.get("description") or subject.get("intro"),
         "rating": subject.get("imdbRatingValue") or subject.get("rating"),
         "director": subject.get("director"),
@@ -762,14 +801,16 @@ def subject_to_entry(subject, moviebox, with_streams=True):
             playable = manifest_from_cookie(cookie)
             if not playable:
                 raw_url = extract_raw_stream_url(st)
-                playable = None if is_notice_url(raw_url) else (raw_url or None)
+                playable = None if is_notice_url(raw_url) else raw_url
             if not playable:
                 continue
 
             found_any = True
-            hdrs = {"Referer": STREAM_REFERER, "User-Agent": moviebox.ua}
-            if cookie:
-                hdrs["Cookie"] = clean_cookie(cookie)
+            hdrs = clean_headers({
+                "Referer": STREAM_REFERER,
+                "User-Agent": moviebox.ua,
+                **({"Cookie": clean_cookie(cookie)} if cookie else {}),
+            })
 
             res_str = st.get("resolutions") or data.get("displayResolutions") or st.get("resolution") or "1080"
             resolutions = []
@@ -838,7 +879,7 @@ def subject_to_entry(subject, moviebox, with_streams=True):
     res_payload = moviebox.resources(sid)
     time.sleep(REQUEST_DELAY)
     if isinstance(res_payload, dict):
-        hdrs = {"Referer": STREAM_REFERER, "User-Agent": moviebox.ua}
+        hdrs = clean_headers({"Referer": STREAM_REFERER, "User-Agent": moviebox.ua})
         for item in res_payload.get("list") or []:
             add_stream(entry["streams"], item, default_headers=hdrs, prepend=True)
 
@@ -846,11 +887,19 @@ def subject_to_entry(subject, moviebox, with_streams=True):
         seen = set()
         uniq = []
         for s in stream_list:
-            key = (s.get("url"), s.get("quality"), s.get("format"), s.get("season"), s.get("episode"))
-            if not s.get("url") or key in seen:
+            u = sanitize_url(s.get("url"))
+            if not u or is_notice_url(u):
+                continue
+            s_clean = dict(s)
+            s_clean["url"] = u
+            s_clean["format"] = detect_format(u)
+            if s_clean.get("headers"):
+                s_clean["headers"] = clean_headers(s_clean["headers"])
+            key = (u, s_clean.get("quality"), s_clean.get("format"), s_clean.get("season"), s_clean.get("episode"))
+            if key in seen:
                 continue
             seen.add(key)
-            uniq.append(s)
+            uniq.append(s_clean)
         return uniq
 
     entry["streams"] = dedup_stream_list(entry["streams"])
@@ -926,8 +975,18 @@ def append_progress(progress_file: str, entry: dict):
 
 # ---------------------------------------------------------------- main -----
 
+def write_validated_json(final_path: str, payload):
+    tmp_path = final_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False, separators=(",", ":"))
+    with open(tmp_path, "r", encoding="utf-8") as fh:
+        parsed = json.load(fh)
+    if not isinstance(parsed, (list, dict)):
+        raise ValueError(f"Invalid JSON structure in {tmp_path}")
+    os.replace(tmp_path, final_path)
+
+
 def write_catalog(done: dict):
-    """Replace old `catalog_part_*.json` chunks only when `done` is non-empty."""
     os.makedirs(OUT_DIR, exist_ok=True)
 
     if not done:
@@ -937,6 +996,7 @@ def write_catalog(done: dict):
             "series": 0,
             "anime": 0,
             "short_tv": 0,
+            "study": 0,
             "genres": 0,
             "total": 0,
             "parts": 0,
@@ -946,7 +1006,7 @@ def write_catalog(done: dict):
         if fname.startswith("catalog_part_") and fname.endswith(".json"):
             os.remove(os.path.join(OUT_DIR, fname))
 
-    counts_by_cat = {"movies": 0, "series": 0, "anime": 0, "short_tv": 0}
+    counts_by_cat = {"movies": 0, "series": 0, "anime": 0, "short_tv": 0, "study": 0}
     genre_counts = {}
     all_items = []
     for entry in done.values():
@@ -974,11 +1034,8 @@ def write_catalog(done: dict):
 
         if current_chunk and (current_bytes + item_len > MAX_CHUNK_BYTES):
             filename = f"catalog_part_{part_num}.json"
-            tmp_path = os.path.join(OUT_DIR, filename + ".tmp")
             final_path = os.path.join(OUT_DIR, filename)
-            with open(tmp_path, "w", encoding="utf-8") as fh:
-                json.dump(current_chunk, fh, ensure_ascii=False, separators=(",", ":"))
-            os.replace(tmp_path, final_path)
+            write_validated_json(final_path, current_chunk)
             generated_files.append(filename)
 
             part_num += 1
@@ -990,11 +1047,8 @@ def write_catalog(done: dict):
 
     if current_chunk:
         filename = f"catalog_part_{part_num}.json"
-        tmp_path = os.path.join(OUT_DIR, filename + ".tmp")
         final_path = os.path.join(OUT_DIR, filename)
-        with open(tmp_path, "w", encoding="utf-8") as fh:
-            json.dump(current_chunk, fh, ensure_ascii=False, separators=(",", ":"))
-        os.replace(tmp_path, final_path)
+        write_validated_json(final_path, current_chunk)
         generated_files.append(filename)
 
     part_entries = []
@@ -1023,6 +1077,8 @@ def write_catalog(done: dict):
     tmp_index = INDEX_FILE + ".tmp"
     with open(tmp_index, "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, ensure_ascii=False, indent=2)
+    with open(tmp_index, "r", encoding="utf-8") as fh:
+        json.load(fh)
     os.replace(tmp_index, INDEX_FILE)
 
     return {
@@ -1030,6 +1086,7 @@ def write_catalog(done: dict):
         "series": counts_by_cat["series"],
         "anime": counts_by_cat["anime"],
         "short_tv": counts_by_cat["short_tv"],
+        "study": counts_by_cat["study"],
         "genres": len(sorted_genres),
         "total": len(all_items),
         "parts": len(generated_files),
@@ -1038,8 +1095,8 @@ def write_catalog(done: dict):
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape MovieBox catalog into ~10MB JSON chunks.")
-    parser.add_argument("--max-titles", type=int, default=1000,
-                        help="Max titles to fetch in this run (default 1000; 0 = unlimited).")
+    parser.add_argument("--max-titles", type=int, default=0,
+                        help="Max titles to fetch per shard in this run (0 = all assigned titles).")
     parser.add_argument("--shard-index", type=int, default=0,
                         help="Current worker shard index (0-based).")
     parser.add_argument("--total-shards", type=int, default=1,
@@ -1057,7 +1114,7 @@ def main():
         counts = write_catalog(merged)
         log(f"MERGE DONE: movies={counts['movies']}, series={counts['series']}, "
             f"anime={counts['anime']}, short_tv={counts['short_tv']}, "
-            f"genres={counts['genres']} -> {counts['parts']} chunks")
+            f"study={counts['study']}, genres={counts['genres']} -> {counts['parts']} chunks")
         return 0
 
     progress_file = get_progress_path(args.shard_index, args.total_shards)
