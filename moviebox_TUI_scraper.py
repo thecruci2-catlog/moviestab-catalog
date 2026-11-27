@@ -1,5 +1,5 @@
 """
-MovieBox catalog scraper -> parallel sharded sync & <23MB JSON chunks for MoviesTab.
+MovieBox catalog scraper -> parallel sharded sync & ~10MB JSON chunks for MoviesTab.
 
 Supports:
   - Parallel sharding (--shard-index 0 --total-shards 4) for fast GitHub Actions runs
@@ -8,7 +8,7 @@ Supports:
   - Normalized `genres` lists (Action, Adventure, Sci-Fi, etc.) + genre counts in `index.json`
   - Clean replacement of old `catalog_part_*.json` chunks + updated `index.json`
   - Batch cap (--max-titles 3000) so jobs stay well under GitHub's 6-hour timeout
-  - Merge mode (--merge-only) to combine current run shard logs into <23MB chunks
+  - Merge mode (--merge-only) to combine current run shard logs into ~10MB chunks
 """
 
 import argparse
@@ -30,8 +30,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(BASE_DIR, "output")
 INDEX_FILE = os.path.join(OUT_DIR, "index.json")
 
-# 22.5 MB safe ceiling so every chunk stays strictly under 23 MB
-MAX_CHUNK_BYTES = 22 * 1024 * 1024 + 512 * 1024
+# 10 MB per chunk for faster parallel mobile downloads and lower memory overhead
+MAX_CHUNK_BYTES = 10 * 1024 * 1024
 
 HOST_POOL = [
     "https://api6.aoneroom.com",
@@ -1077,6 +1077,19 @@ def write_catalog(done: dict):
         os.replace(tmp_path, final_path)
         generated_files.append(filename)
 
+    part_entries = []
+    for filename in generated_files:
+        fpath = os.path.join(OUT_DIR, filename)
+        size_bytes = os.path.getsize(fpath)
+        with open(fpath, "r", encoding="utf-8") as fh:
+            part_len = len(json.load(fh))
+        part_entries.append({
+            "file": filename,
+            "items": part_len,
+            "size_bytes": size_bytes,
+            "size_mb": round(size_bytes / (1024 * 1024), 2),
+        })
+
     manifest = {
         "version_hash": hasher.hexdigest(),
         "updated_at_epoch": int(time.time()),
@@ -1085,6 +1098,7 @@ def write_catalog(done: dict):
         "genres": sorted_genres,
         "total_parts": len(generated_files),
         "files": generated_files,
+        "parts": part_entries,
     }
     tmp_index = INDEX_FILE + ".tmp"
     with open(tmp_index, "w", encoding="utf-8") as fh:
@@ -1103,7 +1117,7 @@ def write_catalog(done: dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Scrape MovieBox catalog into <23MB JSON chunks.")
+    parser = argparse.ArgumentParser(description="Scrape MovieBox catalog into ~10MB JSON chunks.")
     parser.add_argument("--max-titles", type=int, default=3000,
                         help="Max titles to fetch in this run (default 3000; 0 = unlimited).")
     parser.add_argument("--shard-index", type=int, default=0,
@@ -1111,7 +1125,7 @@ def main():
     parser.add_argument("--total-shards", type=int, default=1,
                         help="Total parallel worker shards.")
     parser.add_argument("--merge-only", action="store_true",
-                        help="Merge current run shard files into <23MB JSON chunks and exit.")
+                        help="Merge current run shard files into ~10MB JSON chunks and exit.")
     parser.add_argument("--seeds", default="",
                         help="Comma-separated search keywords instead of the default sweep.")
     args = parser.parse_args()
