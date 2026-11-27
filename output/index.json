@@ -1,14 +1,421 @@
 {
-  "version_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "updated_at_epoch": 1795745899,
-  "total_items": 0,
+  "version_hash": "d4b916baa11d401b535b83264be0ecf24fbf76dd678dfd4093d23533259c4b59",
+  "updated_at_epoch": 1795762172,
+  "total_items": 9119,
   "categories": {
-    "movies": 0,
-    "series": 0,
-    "anime": 0,
-    "short_tv": 0
+    "movies": 5282,
+    "series": 2453,
+    "anime": 374,
+    "short_tv": 1010
   },
-  "genres": {},
-  "total_parts": 0,
-  "files": []
+  "genres": {
+    "Drama": 3294,
+    "Comedy": 2047,
+    "Action": 1254,
+    "Romance": 1046,
+    "Documentary": 855,
+    "Adventure": 701,
+    "Crime": 688,
+    "Thriller": 672,
+    "Modern Drama": 494,
+    "Horror": 484,
+    "Anime": 400,
+    "Fantasy": 350,
+    "Mystery": 336,
+    "Sci-Fi": 315,
+    "Animation": 309,
+    "Family": 289,
+    "Short": 242,
+    "History": 204,
+    "Music": 183,
+    "Biography": 163,
+    "Talk-Show": 126,
+    "Reality-TV": 118,
+    "Wrestling": 114,
+    "Sport": 105,
+    "Reality": 104,
+    "Musical": 97,
+    "War": 93,
+    "Erotic": 87,
+    "drama": 77,
+    "Adult": 61,
+    "News": 51,
+    "Hot": 48,
+    "Game-Show": 44,
+    "Math": 35,
+    "yoruba": 34,
+    "Western": 25,
+    "Gameplay": 24,
+    "English": 23,
+    "Mobile Game": 23,
+    "Nollywood": 23,
+    "Pop": 23,
+    "Bollywood": 22,
+    "Cartoon": 22,
+    "Rock": 21,
+    "Science": 21,
+    "Desi": 20,
+    "Hip Hop & Rap": 19,
+    "AiAdult": 16,
+    "Nursery Rhymes": 16,
+    "Other": 15,
+    "Family & Drama": 12,
+    "Hindi": 12,
+    "IT": 12,
+    "PC Game": 11,
+    "Romantic Conflict": 9,
+    "Song": 9,
+    "Swahili": 9,
+    "Biology": 8,
+    "Hidden Identity": 7,
+    "Betrayal & Deception": 6,
+    "Reading": 6,
+    "Computer Basics": 5,
+    "Sci-Fi & Fantasy": 5,
+    "romance": 5,
+    "Chemistry": 4,
+    "Class & Transformation": 4,
+    "Physics": 4,
+    "Professional Skills": 4,
+    "Sweet": 4,
+    "Contract Marriage": 3,
+    "Counterattack": 3,
+    "Explore": 3,
+    "Film-Noir": 3,
+    "POP": 3,
+    "Power & Ambition": 3,
+    "Revenge": 3,
+    "Action & Adventure": 2,
+    "Afri-Francais": 2,
+    "Business": 2,
+    "Coming of Age": 2,
+    "Data": 2,
+    "Geography": 2,
+    "One Night Stand": 2,
+    "Oriental Fantasy": 2,
+    "Rebirth": 2,
+    "Redemption & Second Chances": 2,
+    "Reluctant Hero": 2,
+    "Ali Abbas": 1,
+    "Billionaire": 1,
+    "Bitter Love": 1,
+    "Costume Drama": 1,
+    "DRAMA": 1,
+    "Destiny": 1,
+    "Divorce": 1,
+    "Drama，Erotic": 1,
+    "Early Learning": 1,
+    "Economics": 1,
+    "Family Romance": 1,
+    "Faryal": 1,
+    "Faysal Quraishi": 1,
+    "Filipino": 1,
+    "Flash Marriage": 1,
+    "Gospel": 1,
+    "Hajra Yamin": 1,
+    "Harem": 1,
+    "Hip Hop": 1,
+    "Hip-Hop": 1,
+    "Job Skills": 1,
+    "Love Triangle": 1,
+    "Marriage Drama": 1,
+    "Maths": 1,
+    "Mehmood": 1,
+    "Melody": 1,
+    "MiniTV": 1,
+    "Movies Drama": 1,
+    "Nollywood Drama": 1,
+    "Physical Edu": 1,
+    "Recap": 1,
+    "Resilience": 1,
+    "School": 1,
+    "Second Chance": 1,
+    "Series Children": 1,
+    "Sociology": 1,
+    "Toxic Relationship": 1,
+    "True Love": 1,
+    "Twisted": 1,
+    "Underdog Rise": 1,
+    "Unlikely Allies": 1,
+    "Unlikely Romance": 1,
+    "Urban": 1,
+    "Western Fantasy": 1,
+    "Yashma Gill": 1,
+    "Youtube": 1,
+    "kids": 1,
+    "minitv": 1,
+    "nollywood": 1,
+    "school": 1
+  },
+  "total_parts": 38,
+  "files": [
+    "catalog_part_1.json",
+    "catalog_part_2.json",
+    "catalog_part_3.json",
+    "catalog_part_4.json",
+    "catalog_part_5.json",
+    "catalog_part_6.json",
+    "catalog_part_7.json",
+    "catalog_part_8.json",
+    "catalog_part_9.json",
+    "catalog_part_10.json",
+    "catalog_part_11.json",
+    "catalog_part_12.json",
+    "catalog_part_13.json",
+    "catalog_part_14.json",
+    "catalog_part_15.json",
+    "catalog_part_16.json",
+    "catalog_part_17.json",
+    "catalog_part_18.json",
+    "catalog_part_19.json",
+    "catalog_part_20.json",
+    "catalog_part_21.json",
+    "catalog_part_22.json",
+    "catalog_part_23.json",
+    "catalog_part_24.json",
+    "catalog_part_25.json",
+    "catalog_part_26.json",
+    "catalog_part_27.json",
+    "catalog_part_28.json",
+    "catalog_part_29.json",
+    "catalog_part_30.json",
+    "catalog_part_31.json",
+    "catalog_part_32.json",
+    "catalog_part_33.json",
+    "catalog_part_34.json",
+    "catalog_part_35.json",
+    "catalog_part_36.json",
+    "catalog_part_37.json",
+    "catalog_part_38.json"
+  ],
+  "parts": [
+    {
+      "file": "catalog_part_1.json",
+      "items": 51,
+      "size_bytes": 10428102,
+      "size_mb": 9.95
+    },
+    {
+      "file": "catalog_part_2.json",
+      "items": 169,
+      "size_bytes": 10324849,
+      "size_mb": 9.85
+    },
+    {
+      "file": "catalog_part_3.json",
+      "items": 220,
+      "size_bytes": 10047379,
+      "size_mb": 9.58
+    },
+    {
+      "file": "catalog_part_4.json",
+      "items": 63,
+      "size_bytes": 9562193,
+      "size_mb": 9.12
+    },
+    {
+      "file": "catalog_part_5.json",
+      "items": 25,
+      "size_bytes": 8495331,
+      "size_mb": 8.1
+    },
+    {
+      "file": "catalog_part_6.json",
+      "items": 49,
+      "size_bytes": 10209726,
+      "size_mb": 9.74
+    },
+    {
+      "file": "catalog_part_7.json",
+      "items": 25,
+      "size_bytes": 8808356,
+      "size_mb": 8.4
+    },
+    {
+      "file": "catalog_part_8.json",
+      "items": 372,
+      "size_bytes": 10281553,
+      "size_mb": 9.81
+    },
+    {
+      "file": "catalog_part_9.json",
+      "items": 102,
+      "size_bytes": 10449309,
+      "size_mb": 9.97
+    },
+    {
+      "file": "catalog_part_10.json",
+      "items": 587,
+      "size_bytes": 10401395,
+      "size_mb": 9.92
+    },
+    {
+      "file": "catalog_part_11.json",
+      "items": 102,
+      "size_bytes": 9897272,
+      "size_mb": 9.44
+    },
+    {
+      "file": "catalog_part_12.json",
+      "items": 155,
+      "size_bytes": 3800131,
+      "size_mb": 3.62
+    },
+    {
+      "file": "catalog_part_13.json",
+      "items": 5,
+      "size_bytes": 9820163,
+      "size_mb": 9.37
+    },
+    {
+      "file": "catalog_part_14.json",
+      "items": 211,
+      "size_bytes": 10421109,
+      "size_mb": 9.94
+    },
+    {
+      "file": "catalog_part_15.json",
+      "items": 213,
+      "size_bytes": 10280535,
+      "size_mb": 9.8
+    },
+    {
+      "file": "catalog_part_16.json",
+      "items": 109,
+      "size_bytes": 10477030,
+      "size_mb": 9.99
+    },
+    {
+      "file": "catalog_part_17.json",
+      "items": 371,
+      "size_bytes": 10185693,
+      "size_mb": 9.71
+    },
+    {
+      "file": "catalog_part_18.json",
+      "items": 149,
+      "size_bytes": 10484085,
+      "size_mb": 10.0
+    },
+    {
+      "file": "catalog_part_19.json",
+      "items": 391,
+      "size_bytes": 10481779,
+      "size_mb": 10.0
+    },
+    {
+      "file": "catalog_part_20.json",
+      "items": 253,
+      "size_bytes": 10442509,
+      "size_mb": 9.96
+    },
+    {
+      "file": "catalog_part_21.json",
+      "items": 428,
+      "size_bytes": 10469145,
+      "size_mb": 9.98
+    },
+    {
+      "file": "catalog_part_22.json",
+      "items": 548,
+      "size_bytes": 10390655,
+      "size_mb": 9.91
+    },
+    {
+      "file": "catalog_part_23.json",
+      "items": 154,
+      "size_bytes": 10247976,
+      "size_mb": 9.77
+    },
+    {
+      "file": "catalog_part_24.json",
+      "items": 239,
+      "size_bytes": 10372667,
+      "size_mb": 9.89
+    },
+    {
+      "file": "catalog_part_25.json",
+      "items": 40,
+      "size_bytes": 8730494,
+      "size_mb": 8.33
+    },
+    {
+      "file": "catalog_part_26.json",
+      "items": 63,
+      "size_bytes": 10151033,
+      "size_mb": 9.68
+    },
+    {
+      "file": "catalog_part_27.json",
+      "items": 432,
+      "size_bytes": 10415871,
+      "size_mb": 9.93
+    },
+    {
+      "file": "catalog_part_28.json",
+      "items": 472,
+      "size_bytes": 10461477,
+      "size_mb": 9.98
+    },
+    {
+      "file": "catalog_part_29.json",
+      "items": 469,
+      "size_bytes": 10452007,
+      "size_mb": 9.97
+    },
+    {
+      "file": "catalog_part_30.json",
+      "items": 389,
+      "size_bytes": 10401036,
+      "size_mb": 9.92
+    },
+    {
+      "file": "catalog_part_31.json",
+      "items": 309,
+      "size_bytes": 10480301,
+      "size_mb": 9.99
+    },
+    {
+      "file": "catalog_part_32.json",
+      "items": 283,
+      "size_bytes": 10481918,
+      "size_mb": 10.0
+    },
+    {
+      "file": "catalog_part_33.json",
+      "items": 113,
+      "size_bytes": 8888317,
+      "size_mb": 8.48
+    },
+    {
+      "file": "catalog_part_34.json",
+      "items": 80,
+      "size_bytes": 10471456,
+      "size_mb": 9.99
+    },
+    {
+      "file": "catalog_part_35.json",
+      "items": 257,
+      "size_bytes": 10401798,
+      "size_mb": 9.92
+    },
+    {
+      "file": "catalog_part_36.json",
+      "items": 235,
+      "size_bytes": 9207017,
+      "size_mb": 8.78
+    },
+    {
+      "file": "catalog_part_37.json",
+      "items": 514,
+      "size_bytes": 10101773,
+      "size_mb": 9.63
+    },
+    {
+      "file": "catalog_part_38.json",
+      "items": 472,
+      "size_bytes": 7230398,
+      "size_mb": 6.9
+    }
+  ]
 }
