@@ -67,6 +67,11 @@ jobs:
       - name: Install requests
         run: pip install requests
 
+      - name: Sync latest main before merging chunks
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
       - name: Download current run shard progress files
         uses: actions/download-artifact@v4
         with:
@@ -74,7 +79,7 @@ jobs:
           pattern: shard-progress-*
           merge-multiple: true
 
-      - name: Replace old chunks with fresh <23MB JSON chunks & update index.json
+      - name: Replace old chunks with fresh ~10MB JSON chunks & update index.json
         run: |
           mkdir -p output
           rm -f output/moviebox_progress*.jsonl
@@ -85,11 +90,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase --autostash -X theirs origin main || true
           git add -A output/catalog_part_*.json output/index.json
           if git diff --staged --quiet; then
             echo "No catalog changes detected."
           else
             git commit -m "chore: sync fresh catalog JSON chunks ($(date -u +'%Y-%m-%d %H:%M UTC'))"
-            git push origin main
+            git fetch origin main
+            git rebase -X ours origin/main || true
+            git push --force-with-lease origin main
           fi
