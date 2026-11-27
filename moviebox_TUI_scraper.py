@@ -1,14 +1,5 @@
 """
-MovieBox catalog scraper -> parallel sharded sync & ~10MB JSON chunks for MoviesTab.
-
-Supports:
-  - Parallel sharding (--shard-index 0 --total-shards 4) for fast GitHub Actions runs
-  - Fresh per-run scraping (does not carry over old progress from prior runs)
-  - Pre-classification into `movies`, `series`, `anime`, and `short_tv`
-  - Normalized `genres` lists (Action, Adventure, Sci-Fi, etc.) + genre counts in `index.json`
-  - Clean replacement of old `catalog_part_*.json` chunks + updated `index.json`
-  - Batch cap (--max-titles 3000) so jobs stay well under GitHub's 6-hour timeout
-  - Merge mode (--merge-only) to combine current run shard logs into ~10MB chunks
+MovieBox catalog scraper -> fast parallel sharded sync & ~10MB JSON chunks for MoviesTab.
 """
 
 import argparse
@@ -30,7 +21,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(BASE_DIR, "output")
 INDEX_FILE = os.path.join(OUT_DIR, "index.json")
 
-# 10 MB per chunk for faster parallel mobile downloads and lower memory overhead
+# ~10 MB per chunk for fast mobile downloads
 MAX_CHUNK_BYTES = 10 * 1024 * 1024
 
 HOST_POOL = [
@@ -43,7 +34,7 @@ HOST_POOL = [
 ]
 
 RETRY_STATUS = {403, 406, 407, 429, 500, 502, 503, 504}
-HTTP_TIMEOUT = 6
+HTTP_TIMEOUT = 5
 
 SECRET_KEY = bytes([
     0xEF, 0xA8, 0x91, 0x97, 0x4E, 0xEC, 0xD3, 0x14,
@@ -60,47 +51,17 @@ SIGNATURE_BODY_MAX_BYTES = 102_400
 TAB_IDS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"]
 
 SEARCH_SEEDS = [
-    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
-    "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-    "aa", "ab", "ac", "ad", "ae", "af", "ag", "ah", "ai", "aj", "ak", "al", "am",
-    "an", "ao", "ap", "aq", "ar", "as", "at", "au", "av", "aw", "ax", "ay", "az",
-    "ba", "be", "bi", "bl", "bo", "br", "bu", "by",
-    "ca", "ce", "ch", "ci", "cl", "co", "cr", "cu",
-    "da", "de", "di", "do", "dr", "du", "dy",
-    "ea", "ec", "ed", "ef", "el", "em", "en", "ep", "er", "es", "et", "ev", "ex",
-    "fa", "fe", "fi", "fl", "fo", "fr", "fu",
-    "ga", "ge", "gh", "gi", "gl", "go", "gr", "gu",
-    "ha", "he", "hi", "ho", "hu",
-    "ia", "id", "ig", "il", "im", "in", "io", "ir", "is", "it",
-    "ja", "je", "ji", "jo", "ju",
-    "ka", "ke", "kh", "ki", "kn", "ko", "kr", "ku", "ky",
-    "la", "le", "li", "lo", "lu", "ly",
-    "ma", "me", "mi", "mo", "mu", "my",
-    "na", "ne", "ni", "no", "nu",
-    "oa", "ob", "oc", "od", "of", "oh", "oi", "ok", "ol", "om", "on", "oo", "op", "or", "os", "ot", "ou", "ov", "ow", "ox",
-    "pa", "pe", "ph", "pi", "pl", "po", "pr", "pu",
-    "qu",
-    "ra", "re", "rh", "ri", "ro", "ru", "ry",
-    "sa", "sc", "se", "sh", "si", "sk", "sl", "sm", "sn", "so", "sp", "sq", "st", "su", "sw", "sy",
-    "ta", "te", "th", "ti", "to", "tr", "ts", "tu", "tw", "ty",
-    "ua", "ub", "uc", "ul", "um", "un", "up", "ur", "us", "ut",
-    "va", "ve", "vi", "vo", "vu",
-    "wa", "we", "wh", "wi", "wo", "wr",
-    "xi", "xu",
-    "ya", "ye", "yi", "yo", "yu",
-    "za", "ze", "zi", "zo",
-    "the", "love", "war", "man", "dark", "night", "star", "india",
+    "a", "e", "i", "o", "u", "s", "t", "m", "r", "n", "l", "d", "c", "p", "b", "h", "g", "k", "w", "f",
     "hindi", "tamil", "telugu", "malayalam", "kannada", "bengali", "marathi", "punjabi",
-    "korean", "japanese", "chinese", "anime", "movie", "film", "series",
-    "season", "part", "story", "life", "king", "queen", "boss", "world",
-    "dead", "last", "one", "two", "three", "2026", "2025", "2024", "2023",
+    "korean", "japanese", "chinese", "anime", "movie", "series", "season", "show",
+    "love", "war", "man", "dark", "night", "king", "queen", "boss", "world", "story",
+    "2026", "2025", "2024", "2023",
 ]
 
 PER_PAGE = 20
-MAX_SEARCH_PAGES = 100
-REQUEST_DELAY = 0.05
-MAX_HOMEPAGE_PAGES = 30
+MAX_SEARCH_PAGES = 10
+REQUEST_DELAY = 0.03
+MAX_HOMEPAGE_PAGES = 10
 
 
 # ------------------------------------------------------------- signing -----
@@ -167,7 +128,6 @@ def random_spoofed_ip() -> str:
 
 
 ANDROID_VERSIONS = [
-    ("9", "PQ3A.190605.03081104"),
     ("10", "QP1A.191005.007.A3"),
     ("11", "RP1A.200720.011"),
     ("12", "S1B.220414.015"),
@@ -177,7 +137,7 @@ REDMI_DEVICES = [
     "23078RKD5C", "2201117TY", "2201117TG", "22101316G",
     "21121210G", "M2012K11AG", "M2007J20CG",
 ]
-VERSION_CODES = [50020117, 50020118, 50020119, 50020120, 50020121]
+VERSION_CODES = [50020118, 50020119, 50020120, 50020121]
 
 
 def generate_identity():
@@ -294,21 +254,20 @@ class MovieBox:
                 if status == 429:
                     ra = resp_headers.get("Retry-After", "0") if resp_headers else "0"
                     try:
-                        backoff = min(float(ra), 3.0)
+                        backoff = min(float(ra), 2.0)
                     except ValueError:
-                        backoff = 0.4
+                        backoff = 0.3
                 time.sleep(backoff)
                 continue
 
             if status >= 400:
-                log(f"  host {idx} status {status}")
+                self.base_idx = (idx + 1) % len(HOST_POOL)
                 continue
 
             self.base_idx = idx
             try:
                 payload = json.loads(text)
             except ValueError:
-                log(f"  host {idx} bad json")
                 continue
 
             return payload.get("data", payload) if isinstance(payload, dict) else payload
@@ -333,14 +292,14 @@ class MovieBox:
         return self._request("POST", path, json.dumps(payload, separators=(",", ":")))
 
     def login(self):
-        for attempt in range(2):
+        for _ in range(2):
             val = self._raw_request(
                 "POST", "/wefeed-mobile-bff/user-api/visitor-login", "{}", None
             )
             if isinstance(val, dict) and val.get("token"):
                 self.token = val["token"]
                 return True
-            time.sleep(1.0)
+            time.sleep(0.5)
         return False
 
     def homepage(self, tab_id, page=1):
@@ -497,7 +456,6 @@ GENRE_CANONICAL = {
 
 
 def normalize_genres(raw_genres):
-    """Return a clean, deduplicated list of genre labels (e.g. Action, Adventure, Sci-Fi)."""
     if not raw_genres:
         return None
 
@@ -635,10 +593,6 @@ def subjects_from_homepage(payload):
 
 
 def classify_category(entry: dict, raw_stype=None) -> str:
-    """
-    Classify item into 'short_tv', 'anime', 'series', or 'movies' so Short TV
-    never leaks into Movies or Series tabs.
-    """
     streams = entry.get("streams") or []
     episodes = entry.get("episodes") or []
     genres = [str(g).lower() for g in (entry.get("genres") or [])]
@@ -856,50 +810,21 @@ def subject_to_entry(subject, moviebox, with_streams=True):
 
         return found_any
 
-    def attach_episode_resources(se_num: int, ep_num: int):
-        res_ep = moviebox.resources(sid, se_num, ep_num)
-        time.sleep(REQUEST_DELAY)
-        if not isinstance(res_ep, dict):
-            return
-        hdrs = {"Referer": STREAM_REFERER, "User-Agent": moviebox.ua}
-        for item in res_ep.get("list") or []:
-            if not isinstance(item, dict):
-                continue
-            link = extract_raw_stream_url(item)
-            if not link or is_notice_url(link):
-                continue
-            stream_obj = {
-                "quality": quality_label(item.get("resolution") or item.get("quality")),
-                "url": link,
-                "format": detect_format(link),
-                "codec": item.get("codecName") or item.get("codec"),
-                "size": item.get("size"),
-                "headers": hdrs,
-                "season": se_num,
-                "episode": ep_num,
-            }
-            for ep in entry["episodes"]:
-                if ep["season"] == se_num and ep["episode"] == ep_num:
-                    ep["streams"].insert(0, stream_obj)
-                    break
-
     if is_series and entry["episodes"]:
         for ep in entry["episodes"]:
             payload = moviebox.play_info(sid, ep["season"], ep["episode"])
             time.sleep(REQUEST_DELAY)
             harvest(payload, ep["season"], ep["episode"])
-            attach_episode_resources(ep["season"], ep["episode"])
     elif is_series:
         miss_streak = 0
-        for ep_num in range(1, 31):
+        for ep_num in range(1, 21):
             payload = moviebox.play_info(sid, 1, ep_num)
             time.sleep(REQUEST_DELAY)
             if harvest(payload, 1, ep_num):
                 miss_streak = 0
-                attach_episode_resources(1, ep_num)
             else:
                 miss_streak += 1
-                if miss_streak >= 3:
+                if miss_streak >= 2:
                     break
         if not entry["episodes"]:
             payload = moviebox.play_info(sid)
@@ -966,7 +891,6 @@ def load_progress(progress_file: str) -> dict:
 
 
 def load_all_merged_progress() -> dict:
-    """Load and deduplicate current-run shard progress files only."""
     merged = {}
     patterns = [
         os.path.join(OUT_DIR, "moviebox_progress.jsonl"),
@@ -1003,8 +927,20 @@ def append_progress(progress_file: str, entry: dict):
 # ---------------------------------------------------------------- main -----
 
 def write_catalog(done: dict):
-    """Replace old `catalog_part_*.json` chunks with fresh ones and update `index.json`."""
+    """Replace old `catalog_part_*.json` chunks only when `done` is non-empty."""
     os.makedirs(OUT_DIR, exist_ok=True)
+
+    if not done:
+        log("WARNING: 0 items scraped in this run; keeping existing catalog_part_*.json and index.json.")
+        return {
+            "movies": 0,
+            "series": 0,
+            "anime": 0,
+            "short_tv": 0,
+            "genres": 0,
+            "total": 0,
+            "parts": 0,
+        }
 
     for fname in os.listdir(OUT_DIR):
         if fname.startswith("catalog_part_") and fname.endswith(".json"):
@@ -1102,8 +1038,8 @@ def write_catalog(done: dict):
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape MovieBox catalog into ~10MB JSON chunks.")
-    parser.add_argument("--max-titles", type=int, default=3000,
-                        help="Max titles to fetch in this run (default 3000; 0 = unlimited).")
+    parser.add_argument("--max-titles", type=int, default=1000,
+                        help="Max titles to fetch in this run (default 1000; 0 = unlimited).")
     parser.add_argument("--shard-index", type=int, default=0,
                         help="Current worker shard index (0-based).")
     parser.add_argument("--total-shards", type=int, default=1,
@@ -1219,7 +1155,7 @@ def main():
             append_progress(progress_file, entry)
             done[sid] = entry
             sample_url = ""
-            if i <= 10:
+            if i <= 5:
                 first_st = next((s.get("url") for s in (entry.get("streams") or []) if s.get("url")), "")
                 if not first_st:
                     for ep in (entry.get("episodes") or []):
